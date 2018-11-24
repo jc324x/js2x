@@ -1,0 +1,13 @@
+{
+	"processes": [{
+			"mode": "markdown",
+			"input": "~/dev/go-lang/js2x/full.js",
+			"output": "~/dev/go-lang/js2x/README.md"
+		},
+		{
+			"mode": "javascript",
+			"input": "~/dev/go-lang/js2x/full.js",
+			"output": "~/dev/go-lang/js2x/library.js"
+		}
+	]
+}
