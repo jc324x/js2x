@@ -14,32 +14,7 @@ import (
 	"strings"
 )
 
-func initializeRun() (ps []Process, sm Summary) {
-	u, err := user.Current()
-
-	if err != nil {
-		log.Fatalf("Fatal: Can't identify the current user")
-	}
-
-	j := strings.Join([]string{u.HomeDir, "/.js2x.json"}, "")
-
-	r, err := ioutil.ReadFile(j)
-
-	if err != nil {
-		log.Fatalf("Fatal: Can't read %v/.js2x.json", u.HomeDir)
-	}
-
-	var c Config
-
-	if err := json.Unmarshal(r, &c); err != nil {
-		log.Fatalf("Fatal: Can't unmarshal %v/.js2x.json", u.HomeDir)
-	}
-
-	ps = c.getProcesses()
-	sm = c.getSummary()
-
-	return ps, sm
-}
+// --> ~/.js2x.json unmarshalled
 
 type Config struct {
 	Summary   string `json:"summary"`
@@ -50,6 +25,7 @@ type Config struct {
 	} `json:"processes"`
 }
 
+// validatePath returns a path string; ~ is expanded to /User/user and trailing slashes are removed
 func validatePath(p string) string {
 	if t := strings.TrimPrefix(p, "~/"); t != p {
 		u, err := user.Current()
@@ -64,6 +40,7 @@ func validatePath(p string) string {
 	return strings.TrimSuffix(p, "/")
 }
 
+// validateTargets
 func validateTarget(m string) string {
 	us := strings.ToUpper(m)
 	switch us {
@@ -644,6 +621,35 @@ func runProcesses(ps []Process, sm *Summary) {
 	for i := 0; i < len(ps); i++ {
 		ps[i].runProcess(sm)
 	}
+}
+
+// --> main fns
+
+func initializeRun() (ps []Process, sm Summary) {
+	u, err := user.Current()
+
+	if err != nil {
+		log.Fatalf("Fatal: Can't identify the current user")
+	}
+
+	j := strings.Join([]string{u.HomeDir, "/.js2x.json"}, "")
+
+	r, err := ioutil.ReadFile(j)
+
+	if err != nil {
+		log.Fatalf("Fatal: Can't read %v/.js2x.json", u.HomeDir)
+	}
+
+	var c Config
+
+	if err := json.Unmarshal(r, &c); err != nil {
+		log.Fatalf("Fatal: Can't unmarshal %v/.js2x.json", u.HomeDir)
+	}
+
+	ps = c.getProcesses()
+	sm = c.getSummary()
+
+	return ps, sm
 }
 
 func main() {
