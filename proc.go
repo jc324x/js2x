@@ -1,102 +1,17 @@
-// Package js2x is the main package.
-package main
+package js2x
 
 import (
 	"bufio"
 	"bytes"
-	"encoding/json"
 	"io"
-	"io/ioutil"
 	"log"
 	"os"
-	"os/user"
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/jychri/goku/brf"
 )
-
-// Config is js2x.json unmarshalled
-type Config struct {
-	Summary   string `json:"summary"`
-	Processes []struct {
-		Target string `json:"target"`
-		Input  string `json:"input"`
-		Output string `json:"output"`
-	} `json:"processes"`
-}
-
-// validatePath returns a path string; ~ is expanded to /User/user and trailing slashes are removed
-func validatePath(p string) string {
-	if t := strings.TrimPrefix(p, "~/"); t != p {
-		u, err := user.Current()
-
-		if err != nil {
-			log.Fatalf("Unable to identify the current user")
-		}
-
-		t := strings.Join([]string{u.HomeDir, "/", t}, "")
-		return strings.TrimSuffix(t, "/")
-	}
-	return strings.TrimSuffix(p, "/")
-}
-
-// validateTargets
-func validateTarget(m string) string {
-	us := strings.ToUpper(m)
-	switch us {
-	case "README":
-	case "LIBRARY":
-	case "QUICK-START":
-	default:
-		log.Fatalf("%v is not a valid target", m)
-	}
-	return us
-}
-
-func validateInputPath(i string) *os.File {
-	if _, err := os.Stat(i); os.IsNotExist(err) {
-		log.Fatalf("No file at path %v", i)
-	}
-
-	file, err := os.OpenFile(i, os.O_RDWR, 0644)
-
-	if err != nil {
-		log.Fatalf("Unable to open file at %v", i)
-	}
-	return file
-}
-
-func lowerKebab(s string) string {
-	s = strings.ToLower(s)
-	s = strings.Replace(s, " ", "-", -1)
-	return s
-}
-
-func trimLine(s string) string {
-	ts := strings.TrimSpace(s)
-	ts = strings.TrimSuffix(s, "\n")
-	return ts
-}
-
-func (c *Config) getProcesses() (ps []Process) {
-	for i := 0; i < len(c.Processes); i++ {
-		cp := c.Processes[i]
-		var p Process
-
-		p.Target = validateTarget(cp.Target)
-		p.InputPath = validatePath(cp.Input)
-		p.OutputPath = validatePath(cp.Output)
-		p.InputFile = validateInputPath(p.InputPath)
-
-		ps = append(ps, p)
-	}
-	return ps
-}
-
-func (c *Config) getSummary() (sm Summary) {
-	sm.OutputPath = validatePath(c.Summary)
-	return sm
-}
 
 // Process ...
 type Process struct {
@@ -386,26 +301,26 @@ func (p *Process) markdownNavLink() {
 		b.WriteString("[")
 		b.WriteString(s)
 		b.WriteString("](#")
-		b.WriteString(lowerKebab(s))
+		b.WriteString(brf.LowerKebab(s))
 		b.WriteString("-1)\n")
 		b.WriteString("=====\n")
 	case "-":
 		b.WriteString("* [")
 		b.WriteString(s)
 		b.WriteString("](#")
-		b.WriteString(lowerKebab(s))
+		b.WriteString(brf.LowerKebab(s))
 		b.WriteString(")\n")
 	case "--":
 		b.WriteString("  * [")
 		b.WriteString(s)
 		b.WriteString("](#")
-		b.WriteString(lowerKebab(s))
+		b.WriteString(brf.LowerKebab(s))
 		b.WriteString(")\n")
 	case "---":
 		b.WriteString("   * [")
 		b.WriteString(s)
 		b.WriteString("](#")
-		b.WriteString(lowerKebab(s))
+		b.WriteString(brf.LowerKebab(s))
 		b.WriteString(")\n")
 	}
 
@@ -549,17 +464,10 @@ func (p *Process) writeToFile() {
 	}
 }
 
-// Summary ...
-type Summary struct {
-	LineIndex  int
-	OutputPath string
-	Buff       bytes.Buffer
-}
-
 func (sm *Summary) writeToBuffer(p *Process) {
 
-	p.SummaryInput = trimLine(p.LineInput)
-	p.SummaryOutput = trimLine(p.LineOutput)
+	p.SummaryInput = brf.Trim(p.LineInput)
+	p.SummaryOutput = brf.Trim(p.LineOutput)
 
 	var b bytes.Buffer
 
@@ -603,59 +511,4 @@ func (sm *Summary) writeToBuffer(p *Process) {
 	b.WriteString("\n")
 
 	sm.Buff.WriteString(b.String())
-}
-
-func (sm *Summary) writeToFile() {
-	var r io.Reader
-	r = &sm.Buff
-	file, err := os.Create(sm.OutputPath)
-
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	if _, err := io.Copy(file, r); err != nil {
-		log.Fatal(err)
-	}
-}
-
-func runProcesses(ps []Process, sm *Summary) {
-	for i := 0; i < len(ps); i++ {
-		ps[i].runProcess(sm)
-	}
-}
-
-// --> main fns
-
-func initializeRun() (ps []Process, sm Summary) {
-	u, err := user.Current()
-
-	if err != nil {
-		log.Fatalf("Fatal: Can't identify the current user")
-	}
-
-	j := strings.Join([]string{u.HomeDir, "/.js2x.json"}, "")
-
-	r, err := ioutil.ReadFile(j)
-
-	if err != nil {
-		log.Fatalf("Fatal: Can't read %v/.js2x.json", u.HomeDir)
-	}
-
-	var c Config
-
-	if err := json.Unmarshal(r, &c); err != nil {
-		log.Fatalf("Fatal: Can't unmarshal %v/.js2x.json", u.HomeDir)
-	}
-
-	ps = c.getProcesses()
-	sm = c.getSummary()
-
-	return ps, sm
-}
-
-func main() {
-	ps, sm := initializeRun()
-	runProcesses(ps, &sm)
-	sm.writeToFile()
 }
